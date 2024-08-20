@@ -44,7 +44,7 @@ CREATE OR REPLACE PACKAGE traveler_assistance_package AS
     PROCEDURE print_language_array(country_language country_languages_type); -- Procedimiento 6
 END;
 
-
+DESCRIBE WF_countries;
 CREATE OR REPLACE PACKAGE BODY traveler_assistance_package AS
     -- 1. Crea un procedimiento llamado country_demographics para mostrar información específica acerca
     -- de un país.
