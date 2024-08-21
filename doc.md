@@ -1,4 +1,4 @@
-# Documentación
+# Documentación: Sistema gestor de viajeros
 El primer paso para empezar el proyecto, como es lógico, fue leer las instrucciones, donde nos dimos cuenta que durante el proyecto debiamos trabajar en dos paquetes, `traveler_assistance_package` y `traveler_admin_package`.
 
 ## Paquete **TRAVELER ASSISTANCE**.

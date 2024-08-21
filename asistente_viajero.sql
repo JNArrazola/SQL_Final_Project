@@ -10,8 +10,6 @@ SELECT * FROM WF_LANGUAGES;
 
 -- PACKAGE HEADER
 CREATE OR REPLACE PACKAGE traveler_assistance_package AS
-
-    -- Procedimiento 1
     TYPE country_record IS RECORD (
         country_name WF_COUNTRIES.COUNTRY_NAME%TYPE,
         location WF_COUNTRIES.LOCATION%TYPE,
@@ -21,7 +19,6 @@ CREATE OR REPLACE PACKAGE traveler_assistance_package AS
         climate WF_COUNTRIES.CLIMATE%TYPE
     );
 
-    -- Procedimiento 2
     TYPE country_type IS RECORD(
         country_name WF_COUNTRIES.country_name%TYPE,
         region WF_WORLD_REGIONS.REGION_NAME%TYPE,
@@ -44,7 +41,6 @@ CREATE OR REPLACE PACKAGE traveler_assistance_package AS
     PROCEDURE print_language_array(country_language country_languages_type); -- Procedimiento 6
 END;
 
-DESCRIBE WF_countries;
 CREATE OR REPLACE PACKAGE BODY traveler_assistance_package AS
     -- 1. Crea un procedimiento llamado country_demographics para mostrar información específica acerca
     -- de un país.
@@ -91,7 +87,7 @@ CREATE OR REPLACE PACKAGE BODY traveler_assistance_package AS
     -- 3. Crea un procedimiento countries_in_same_region para leer y devolver todos los países en la misma 
     -- región.  
     -- • Pasa REGION_NAME como un parámetro de entrada y un arreglo asociativo de registros 
-    -- (una tabla INDEX BY ) como parámetro de salida. Devuelve REGION_NAME, 
+    -- (una tabla INDEX BY) como parámetro de salida. Devuelve REGION_NAME, 
     -- COUNTRY_NAME, y  CURRENCY_NAME  por medio del parámetro de salida para todos los 
     -- países en la región solicitada.
     PROCEDURE countries_in_same_region(v_region_name IN VARCHAR2, countries OUT countries_type) IS
