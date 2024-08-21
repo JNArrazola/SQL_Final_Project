@@ -88,24 +88,33 @@ CREATE OR REPLACE PACKAGE BODY traveler_assistance_package AS
             RAISE_APPLICATION_ERROR(-20001, 'No se encontraron ciudades para ' || v_country_name);
     END;
 
-    -- 3. Crea un procedimiento countries_in_same_region para leer y devolver todos los países en la misma
-    -- región.
-    -- • Pasa REGION_NAME como un parámetro de entrada y un arreglo asociativo de registros
-    -- (una tabla INDEX BY ) como parámetro de salida. Devuelve REGION_NAME,
-    -- COUNTRY_NAME, y CURRENCY_NAME por medio del parámetro de salida para todos los
+    -- 3. Crea un procedimiento countries_in_same_region para leer y devolver todos los países en la misma 
+    -- región.  
+    -- • Pasa REGION_NAME como un parámetro de entrada y un arreglo asociativo de registros 
+    -- (una tabla INDEX BY ) como parámetro de salida. Devuelve REGION_NAME, 
+    -- COUNTRY_NAME, y  CURRENCY_NAME  por medio del parámetro de salida para todos los 
     -- países en la región solicitada.
     PROCEDURE countries_in_same_region(v_region_name IN VARCHAR2, countries OUT countries_type) IS
-        CURSOR countries_region IS SELECT c.country_name, r.region_name, cu.currency_name
-            FROM WF_COUNTRIES c, WF_WORLD_REGIONS r, WF_CURRENCIES cu
-            WHERE c.region_id = r.region_id 
-            AND LOWER(r.region_name) = LOWER(v_region_name)
-            AND c.currency_code = cu.currency_code;
+        v_country country_type;
         i PLS_INTEGER := 1;
     BEGIN
-        FOR country IN countries_region LOOP -- HASHMAP
-            countries(i) := country;
+        FOR r IN (SELECT c.country_name, r.region_name, cu.currency_name
+                  FROM WF_COUNTRIES c
+                  JOIN WF_WORLD_REGIONS r ON c.region_id = r.region_id
+                  JOIN WF_CURRENCIES cu ON c.currency_code = cu.currency_code
+                  WHERE LOWER(r.region_name) = LOWER(v_region_name)) LOOP
+            
+            v_country.country_name := r.country_name;
+            v_country.region := r.region_name;
+            v_country.currency := r.currency_name;
+    
+            countries(i) := v_country;
             i := i + 1;
         END LOOP;
+    
+        IF i = 1 THEN
+            RAISE NO_DATA_FOUND;
+        END IF;
     EXCEPTION
         WHEN NO_DATA_FOUND THEN
             RAISE_APPLICATION_ERROR(-20001, 'No se encontraron ciudades para ' || v_region_name);
@@ -126,27 +135,35 @@ CREATE OR REPLACE PACKAGE BODY traveler_assistance_package AS
         END LOOP;
     END;
 
-
     -- 5. Crea un procedimiento country_languages para leer y devolver todos los idiomas hablados, así como
     -- el idioma oficial de un país.
     -- • Pasa COUNTRY_NAME como un parámetro de entrada. El parámetro de salida será un arreglo
     -- asociativo que devolverá las columnas COUNTRY_NAME, LANGUAGE_NAME and
     -- OFFICIAL. 
-    PROCEDURE country_languages(v_country_name IN VARCHAR2, country_lang OUT country_languages_type ) IS
-        CURSOR country_languages_cursor IS SELECT c.country_name, l.language_name, sl.official
-            FROM WF_COUNTRIES c,WF_LANGUAGES l, WF_SPOKEN_LANGUAGES sl
-            WHERE UPPER(c.country_name) = UPPER(v_country_name)
-                AND c.country_id = sl.country_id
-                AND sl.language_id = l.language_id;
+    PROCEDURE country_languages(v_country_name IN VARCHAR2, country_lang OUT country_languages_type) IS
+        v_language country_language_type;
         i PLS_INTEGER := 1;
     BEGIN
-        FOR country_language IN country_languages_cursor LOOP
-            country_lang(i) := country_language;
+        FOR r IN (SELECT c.country_name, l.language_name, sl.official
+                  FROM WF_COUNTRIES c
+                  JOIN WF_SPOKEN_LANGUAGES sl ON c.country_id = sl.country_id
+                  JOIN WF_LANGUAGES l ON sl.language_id = l.language_id
+                  WHERE UPPER(c.country_name) = UPPER(v_country_name)) LOOP
+
+            v_language.country_name := r.country_name;
+            v_language.language_name := r.language_name;
+            v_language.official_language := r.official;
+            
+            country_lang(i) := v_language;
             i := i + 1;
         END LOOP;
+
+        IF i = 1 THEN
+            RAISE NO_DATA_FOUND;
+        END IF;
     EXCEPTION
         WHEN NO_DATA_FOUND THEN
-            RAISE_APPLICATION_ERROR(-20001, 'No se encontraron ciudades para ' || v_country_name);
+            RAISE_APPLICATION_ERROR(-20001, 'No se encontraron idiomas para el país: ' || v_country_name);
     END;
 
     -- 6. Crea un procedimiento print_language_array para mostrar el contenido de un arreglo asociativo de
@@ -193,6 +210,12 @@ BEGIN
 END;
 
 -- Procedimiento 3 y procedimiento 4
+SELECT c.country_name, r.region_name, cu.currency_name
+FROM WF_COUNTRIES c
+JOIN WF_WORLD_REGIONS r ON c.region_id = r.region_id
+JOIN WF_CURRENCIES cu ON c.currency_code = cu.currency_code
+WHERE LOWER(r.region_name) = LOWER('Central America');
+
 DECLARE
     region_name VARCHAR2(50) := 'Central America';
     countries TRAVELER_ASSISTANCE_PACKAGE.countries_type;
@@ -209,7 +232,6 @@ BEGIN
     TRAVELER_ASSISTANCE_PACKAGE.COUNTRY_LANGUAGES(country_name, country_langs);
     TRAVELER_ASSISTANCE_PACKAGE.PRINT_LANGUAGE_ARRAY(country_langs);
 END;
-
 
 -- ===============================================
 -- PAQUETE 2: Administración del sistema de viajeros
