@@ -268,41 +268,45 @@ CREATE OR REPLACE PACKAGE BODY traveler_admin_package AS
     -- 1. Crear un procedimiento display_disabled_triggers que muestre una lista de todos los triggers
     -- deshabilitados en tu esquema.
     PROCEDURE display_disabled_triggers IS
-    
-    CURSOR triggers IS SELECT 
-    trigger_name FROM user_triggers 
-    WHERE status = 'DISABLED';
-
+        CURSOR disabled_triggers IS
+            SELECT trigger_name 
+            FROM user_triggers 
+            WHERE status = 'DISABLED';
     BEGIN
-        FOR trigger IN triggers LOOP
-            DBMS_OUTPUT.PUT_LINE( 'El trigger ' || trigger.trigger_name ||' está desactivado' );
+        -- Uso de un contador para verificar si existen triggers deshabilitados
+        FOR trigger_rec IN disabled_triggers LOOP
+            DBMS_OUTPUT.PUT_LINE('Trigger deshabilitado: ' || trigger_rec.trigger_name);
         END LOOP;
-    END;
+    END display_disabled_triggers;
 
     -- 2. Crea una función all_dependent_objects que devuelva todos los objetos dependientes de un objeto en
     -- particular.
     -- Pasa OBJECT_NAME como un parámetro de entrada y devuelve un arreglo que contenga los
     -- valores NAME , TYPE, REFERENCED_NAME AND REFERENCED_TYPE. 
-    FUNCTION all_dependent_objects(object_name VARCHAR2)
-    RETURN obj_arr IS
-        v_objects obj_arr;
+    FUNCTION all_dependent_objects(object_name VARCHAR2) RETURN obj_arr IS
+        CURSOR dep_objects IS
+            SELECT name, type, referenced_name, referenced_type 
+            FROM USER_DEPENDENCIES 
+            WHERE referenced_name = UPPER(object_name);
+        
+        v_objects obj_arr;  -- Arreglo para almacenar resultados
+        idx PLS_INTEGER := 0;    -- Índice inicial
     BEGIN
-        -- Usamos BULK COLLECT para llenar el arreglo de una sola vez
-        SELECT name, type, referenced_name, referenced_type
-        BULK COLLECT INTO v_objects
-        FROM user_dependencies 
-        WHERE referenced_name = UPPER(object_name);
+        FOR dep_rec IN dep_objects LOOP
+            idx := idx + 1;
+            v_objects(idx).name := dep_rec.name;
+            v_objects(idx).type := dep_rec.type;
+            v_objects(idx).referenced_name := dep_rec.referenced_name;
+            v_objects(idx).referenced_type := dep_rec.referenced_type;
+        END LOOP;
 
-        -- Si no se encontraron objetos, se lanza una excepción
-        IF v_objects.COUNT < 1 THEN
-            RAISE NO_DATA_FOUND;
+        -- Manejo de caso cuando no hay objetos dependientes
+        IF v_objects.COUNT = 0 THEN
+            RAISE_APPLICATION_ERROR(-20001, 'No se encontraron objetos dependientes para ' || object_name);
         END IF;
 
         RETURN v_objects;
-    EXCEPTION
-        WHEN NO_DATA_FOUND THEN
-            RAISE_APPLICATION_ERROR(-20001, 'No se encontraron datos');
-    END;
+    END all_dependent_objects;
 
     -- 3. Crea un procedimiento print_dependent_objects que muestre el arreglo de los objetos dependientes
     -- devuelto por la función all_dependent_objects. 
@@ -323,32 +327,27 @@ END;
 -- =======
 
 -- Procedimiento 1
--- Imprimimos los triggers
-SELECT trigger_name FROM user_triggers;
 
--- Desactivamos el trigger llamado GUNS_BEFORE_INSERT
-ALTER TRIGGER GUNS_BEFORE_INSERT DISABLE;
-
---- Mostramos el trigger desactivado
+-- Crear un trigger de ejemplo
+CREATE OR REPLACE TRIGGER trigger_prueba
+BEFORE INSERT ON EMPLOYEES
+FOR EACH ROW
 BEGIN
-    traveler_admin_package.display_disabled_triggers();
+    DBMS_OUTPUT.PUT_LINE('Trigger activado');
 END;
 
---- Activamos el Trigger GUNS_BEFORE_INSERT
-ALTER TRIGGER GUNS_BEFORE_INSERT ENABLE;
+-- Deshabilitar el trigger creado
+ALTER TRIGGER trigger_prueba DISABLE;
 
--- Mostramos el Trigger activado
+-- Ejecutar el procedimiento para mostrar los triggers deshabilitados
 BEGIN
-    traveler_admin_package.display_disabled_triggers();
+    traveler_admin_package.display_disabled_triggers;
 END;
-
 
 -- Procedimiento 2 y 3
-SELECT * FROM user_dependencies WHERE referenced_name = 'REGIONS';
-
 DECLARE
-    v_objects TRAVELER_ADMIN_PACKAGE.obj_arr;
+    dependent_objects traveler_admin_package.obj_arr;
 BEGIN
-    v_objects := traveler_admin_package.all_dependent_objects('regions');
-    traveler_admin_package.print_dependent_objects(v_objects);
+    dependent_objects := traveler_admin_package.all_dependent_objects('EMPLOYEES');
+    traveler_admin_package.print_dependent_objects(dependent_objects);
 END;

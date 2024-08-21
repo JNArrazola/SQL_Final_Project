@@ -69,7 +69,7 @@ CURRENCY_CODE	NOT NULL	VARCHAR2(7)
 ```
 > Donde podemos observar que dichas columnas se encuentran en la tabla `WF_COUNTRIES`.
 
-Posteriormente, la instrucción nos pide algo bien específico: "Usa una estructura de registro definido por el Usuario para la cláusula INTO de tu sentencia Select", donde la palabra clave es "*esctructura de registro*", que nos insinúa que debemos utilizar alguna estructura de datos capaz de alojar toda la información obtenida. Dada la situación, el uso de un `RECORD` es de gran utilidad. 
+Posteriormente, la instrucción nos pide algo bien específico: "Usa una estructura de registro definido por el Usuario para la cláusula INTO de tu sentencia Select", donde la palabra clave es "*estructura de registro*", que nos insinúa que debemos utilizar alguna estructura de datos capaz de alojar toda la información obtenida. Dada la situación, el uso de un `RECORD` es de gran utilidad. 
 
 Teniendo en cuenta los datos que debemos obtener, creamor un `RECORD` que sea capaz de almacenar todo ello, esto primeramente debe estar definido en el *package header*:
 ```sql
@@ -142,7 +142,7 @@ SQL>   DESCRIBE WF_COUNTRIES;
 Name	Null?	Type
 COUNTRY_ID	NOT NULL	NUMBER(4)
 REGION_ID	NOT NULL	NUMBER(3) -- IDENTIFICADOR DE CADA REGIÓN
-COUNTRY_NAME	NOT NULL	VARCHAR2(70) -- COLUMNA CON LA CUAL COMPARAR EL PARÁMETRO
+COUNTRY_NAME	NOT NULL	VARCHAR2(70) 
 COUNTRY_TRANSLATED_NAME		VARCHAR2(40)
 LOCATION		VARCHAR2(90)
 CAPITOL		VARCHAR2(50)
@@ -476,3 +476,154 @@ El paquete en cuestión cuenta con tres procedimientos:
 2. all_dependent_objects
 3. print_dependent_objects
 
+### 1. **display_disabled_triggers**
+El procedimiento `display_disabled_triggers` tiene como propósito *mostrar* una lista de todos los triggers que se encuentran **deshabilitados** en el esquema del usuario actual. Esta función es especialmente **útil** para los **administradores de bases de datos**, quienes necesitan *identificar rápidamente* los triggers que no están en funcionamiento, ya sea para revisarlos, reactivarlos, o simplemente para tener un control del estado de su esquema.
+
+Para comenzar, definimos el procedimiento en el *package header* del paquete `traveler_admin_package` con la siguiente declaración:
+```sql
+PROCEDURE display_disabled_triggers IS
+```
+
+Dentro del *cuerpo del procedimiento*, primero se declara un cursor denominado `disabled_triggers`, que se encarga de seleccionar los nombres de todos los triggers cuyo estado es **DISABLED** en la tabla `user_triggers`. Esta tabla es parte del diccionario de datos de *Oracle* y contiene información sobre todos los triggers creados en el esquema del usuario. La consulta utilizada en el cursor es la siguiente:
+```sql
+CURSOR disabled_triggers IS
+SELECT trigger_name 
+FROM user_triggers 
+WHERE status = 'DISABLED';
+```
+El procedimiento utiliza un **FOR LOOP** para iterar sobre cada registro devuelto por el cursor `disabled_triggers`. En cada iteración, el procedimiento recupera el nombre del trigger **deshabilitado** y lo imprime en la consola utilizando la función `DBMS_OUTPUT.PUT_LINE`. Esto permite al administrador visualizar de manera **clara** y **ordenada** todos los triggers que se encuentran *deshabilitados*:
+```sql
+FOR trigger_rec IN disabled_triggers LOOP
+    DBMS_OUTPUT.PUT_LINE('Trigger deshabilitado: ' || trigger_rec.trigger_name);
+END LOOP;
+```
+Este bucle asegura que **todos los triggers deshabilitados** se muestren en la salida, proporcionando al administrador una lista completa de aquellos que necesitan atención.
+
+Finalmente, el procedimiento se completa **sin necesidad** de manejar excepciones explícitas, dado que simplemente lista los triggers deshabilitados y **no interactúa** con operaciones que podrían resultar en errores *complejos*.
+
+### 2. **all_dependent_objects**
+La función `all_dependent_objects` está diseñada para devolver todos los objetos que **dependen** de un objeto específico en el esquema de base de datos. Primero, definimos la función en el package header del paquete traveler_admin_package con la siguiente declaración:
+```sql
+FUNCTION all_dependent_objects(object_name VARCHAR2) RETURN obj_arr;
+```
+Dentro del cuerpo de la función, se *declara* un cursor llamado **dep_objects**, que selecciona los nombres (`name`), tipos (`type`), nombres referenciados (`referenced_name`), y tipos referenciados (`referenced_type`) de los objetos *dependientes* en la tabla `USER_DEPENDENCIES`. Esta tabla es parte del **diccionario de datos de Oracle** y almacena información sobre las dependencias entre objetos dentro del esquema del usuario. La consulta en el cursor es la siguiente:
+```sql
+CURSOR dep_objects IS
+SELECT name, type, referenced_name, referenced_type 
+FROM USER_DEPENDENCIES 
+WHERE referenced_name = UPPER(object_name);
+```
+La función declara un arreglo de registros `v_objects` de tipo `obj_arr`, que se utilizará para **almacenar** los resultados obtenidos del cursor. Además, se inicializa un índice `idx` de tipo **PLS_INTEGER** con el valor **0**, que se usará para recorrer y llenar el arreglo:
+```sql
+v_objects obj_arr;  -- Arreglo para almacenar resultados
+idx PLS_INTEGER := 0;    -- Índice inicial
+```
+La función utiliza un **FOR LOOP** para iterar sobre cada registro devuelto por el cursor `dep_objects`. En cada iteración, se incrementa el índice `idx` y se almacenan en `v_objects(idx)` los valores `name`, `type`, `referenced_name`, y `referenced_type` del **registro actual**:
+```sql
+FOR dep_rec IN dep_objects LOOP
+    idx := idx + 1;
+    v_objects(idx).name := dep_rec.name;
+    v_objects(idx).type := dep_rec.type;
+    v_objects(idx).referenced_name := dep_rec.referenced_name;
+    v_objects(idx).referenced_type := dep_rec.referenced_type;
+END LOOP;
+```
+Este bucle garantiza que todos los objetos dependientes del objeto especificado se almacenen en el arreglo `v_objects`.
+
+Una vez que el bucle ha finalizado, la función **verifica** si el arreglo `v_objects` contiene algún elemento utilizando `v_objects.COUNT`. Si el arreglo está *vacío*, lo que indica que no se encontraron objetos dependientes, se lanza una excepción mediante `RAISE_APPLICATION_ERROR`:
+```sql
+IF v_objects.COUNT = 0 THEN
+    RAISE_APPLICATION_ERROR(-20001, 'No se encontraron objetos dependientes para ' || object_name);
+END IF;
+```
+Finalmente, si se encuentran dependencias, la función **retorna** el arreglo `v_objects` con todos los registros de los objetos dependientes almacenados en él:
+```sql
+RETURN v_objects;
+```
+3. **print_dependent_objects**
+El procedimiento `print_dependent_objects` está diseñado para **mostrar** el contenido de un arreglo de registros que contiene información sobre **objetos dependientes** dentro del esquema de base de datos. Para comenzar, definimos el procedimiento en el *package header* del paquete `traveler_admin_package` con la siguiente declaración:
+```sql
+PROCEDURE print_dependent_objects(objects IN obj_arr);
+```
+El procedimiento toma como *parámetro de entrada* un arreglo (`objects`) de tipo `obj_arr`, que contiene registros con información sobre los **nombres** y **tipos de objetos** dependientes, así como los nombres y tipos de los *objetos referenciados*.
+
+Dentro del cuerpo del procedimiento, se utiliza un **FOR LOOP** para recorrer el arreglo `objects` desde el primer índice (`objects.FIRST`) hasta el último (`objects.LAST`). Este bucle asegura que **todos los registros** almacenados en el arreglo se procesen y se impriman:
+```sql
+FOR i IN objects.FIRST .. objects.LAST LOOP
+```
+Durante cada iteración del bucle, se **imprimen** en la consola los valores de `name`, `type`, `referenced_name`, y `referenced_type` correspondientes al registro almacenado en la posición `i` del arreglo. Estos valores se imprimen de manera **estructurada** y **legible** utilizando la función `DBMS_OUTPUT.PUT_LINE`:
+```sql
+DBMS_OUTPUT.PUT_LINE('Object Name        : ' || objects(i).name);
+DBMS_OUTPUT.PUT_LINE('Object Type        : ' || objects(i).type);
+DBMS_OUTPUT.PUT_LINE('Referenced Name    : ' || objects(i).referenced_name);
+DBMS_OUTPUT.PUT_LINE('Referenced Type    : ' || objects(i).referenced_type);
+```
+Además, para mejorar la **legibilidad** y **separar** visualmente cada registro, se imprime una *línea de separación* utilizando una serie de guiones:
+```sql
+DBMS_OUTPUT.PUT_LINE('------------------------------------------');
+```
+
+## Pruebas de funcionamiento
+### Prueba 1:
+```sql
+CREATE OR REPLACE TRIGGER trigger_prueba
+BEFORE INSERT ON EMPLOYEES
+FOR EACH ROW
+BEGIN
+    DBMS_OUTPUT.PUT_LINE('Trigger activado');
+END;
+
+-- Deshabilitar el trigger creado
+ALTER TRIGGER trigger_prueba DISABLE;
+
+-- Ejecutar el procedimiento para mostrar los triggers deshabilitados
+BEGIN
+    traveler_admin_package.display_disabled_triggers;
+END;
+```
+Primero, se crea un trigger llamado `trigger_prueba`, que se activa antes de cualquier operación de inserción en la tabla `EMPLOYEES`. Este trigger es **simple** y su única acción es **imprimir un mensaje** en la consola cuando es activado:
+```sql
+CREATE OR REPLACE TRIGGER trigger_prueba
+BEFORE INSERT ON EMPLOYEES
+FOR EACH ROW
+BEGIN
+    DBMS_OUTPUT.PUT_LINE('Trigger activado');
+END;
+```
+Una vez que el trigger `trigger_prueba` ha sido creado, el siguiente paso es **deshabilitarlo**. Esto se logra con la instrucción `ALTER TRIGGER`, como se muestra a continuación:
+```sql
+ALTER TRIGGER trigger_prueba DISABLE;
+```
+El propósito de **deshabilitar** el trigger es asegurarse de que el procedimiento `display_disabled_triggers` pueda *identificar* y **listar los triggers deshabilitados** en el esquema.
+
+Finalmente, se ejecuta el procedimiento `display_disabled_triggers` para comprobar si el trigger deshabilitado (`trigger_prueba`) es correctamente **identificado** y **listado**. La ejecución del procedimiento se realiza con el siguiente bloque PL/SQL:
+```sql
+BEGIN
+    traveler_admin_package.display_disabled_triggers;
+END;
+```
+### Prueba 2:
+```sql
+DECLARE
+    dependent_objects traveler_admin_package.obj_arr;
+BEGIN
+    dependent_objects := traveler_admin_package.all_dependent_objects('EMPLOYEES');
+    traveler_admin_package.print_dependent_objects(dependent_objects);
+END;
+```
+Para validar el funcionamiento de las funciones `all_dependent_objects` y `print_dependent_objects` del paquete `traveler_admin_package`, se realiza la siguiente prueba.
+
+Se comienza declarando una variable llamada `dependent_objects` de tipo `obj_arr`, que es el tipo de arreglo utilizado para *almacenar* la lista de **objetos dependientes**:
+```sql
+DECLARE dependent_objects traveler_admin_package.obj_arr;
+```
+A continuación, se llama a la función `all_dependent_objects`, pasando el nombre del objeto `EMPLOYEES` como *argumento*. Esta función retorna un **arreglo** con todos los objetos que dependen **directamente** del objeto especificado. El resultado se almacena en la variable `dependent_objects`:
+```sql
+BEGIN 
+    dependent_objects := traveler_admin_package.all_dependent_objects('EMPLOYEES');
+```
+Una vez que se ha obtenido la lista de objetos dependientes, se procede a **imprimir el contenido** de este arreglo utilizando el procedimiento `print_dependent_objects`. Este procedimiento recorre el arreglo `dependent_objects` y muestra en la consola los *detalles* de cada objeto dependiente, incluyendo su nombre, tipo, el nombre del objeto referenciado y el tipo de objeto referenciado:
+```sql
+    traveler_admin_package.print_dependent_objects(dependent_objects);
+END;
+```
