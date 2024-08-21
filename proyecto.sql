@@ -225,6 +225,12 @@ BEGIN
 END;
 
 -- Procedimiento 5 y procedimiento 6
+SELECT c.country_name, l.language_name, sl.official
+FROM WF_COUNTRIES c
+JOIN WF_SPOKEN_LANGUAGES sl ON c.country_id = sl.country_id
+JOIN WF_LANGUAGES l ON sl.language_id = l.language_id
+WHERE UPPER(c.country_name) = UPPER('Belize');
+
 DECLARE
     country_name VARCHAR2(50) := 'Belize';
     country_langs TRAVELER_ASSISTANCE_PACKAGE.country_languages_type;

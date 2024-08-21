@@ -360,7 +360,7 @@ END;
 ```
 Al ejecutar este bloque, el procedimiento debería mostrar en la consola los valores correspondientes a `COUNTRY_NAME`, `LOCATION`, `CAPITOL`, `POPULATION`, `AIRPORTS`, y `CLIMATE` para **"Mongolia"**. Los resultados que el procedimiento imprime **deben coincidir** con los obtenidos en la consulta directa que realizamos *previamente*. Si la información mostrada por el procedimiento es la misma que la obtenida a través de la consulta SQL, podemos **concluir** que el procedimiento `country_demographics` funciona **correctamente**.
 
-## Prueba 2: 
+### Prueba 2: 
 ```sql
 SELECT c.country_name, wr.region_name, cu.currency_name 
         FROM WF_COUNTRIES c, WF_WORLD_REGIONS wr, WF_CURRENCIES cu
@@ -395,3 +395,84 @@ BEGIN
 END;
 ```
 El procedimiento **debería** imprimir en la consola los valores de `COUNTRY_NAME`, `REGION_NAME`, y `CURRENCY_NAME` para **"Mongolia"**, que deben coincidir con los resultados obtenidos de la consulta directa previa. Si los datos mostrados por el procedimiento son **consistentes** con los obtenidos en la consulta, podemos concluir que el procedimiento `find_region_and_currency` está funcionando **correctamente**.
+
+### Prueba 3: 
+```sql
+SELECT c.country_name, r.region_name, cu.currency_name
+FROM WF_COUNTRIES c
+JOIN WF_WORLD_REGIONS r ON c.region_id = r.region_id
+JOIN WF_CURRENCIES cu ON c.currency_code = cu.currency_code
+WHERE LOWER(r.region_name) = LOWER('Central America');
+
+DECLARE
+    region_name VARCHAR2(50) := 'Central America';
+    countries TRAVELER_ASSISTANCE_PACKAGE.countries_type;
+BEGIN
+    TRAVELER_ASSISTANCE_PACKAGE.COUNTRIES_IN_SAME_REGION(region_name, countries);
+    TRAVELER_ASSISTANCE_PACKAGE.PRINT_REGION_ARRAY(countries);
+END;
+```
+Para probar el procedimiento `countries_in_same_region` del paquete `traveler_assistance_package`, comenzamos realizando una consulta directa a las tablas `WF_COUNTRIES`, `WF_WORLD_REGIONS`, y `WF_CURRENCIES` para obtener los valores de `COUNTRY_NAME`, `REGION_NAME`, y `CURRENCY_NAME` para todos los países que pertenecen a la región "Central America". Esta consulta sirve como referencia para comparar y validar los resultados que serán generados por el procedimiento. La consulta SQL utilizada es la siguiente:
+```sql
+SELECT c.country_name, r.region_name, cu.currency_name
+FROM WF_COUNTRIES c
+JOIN WF_WORLD_REGIONS r ON c.region_id = r.region_id
+JOIN WF_CURRENCIES cu ON c.currency_code = cu.currency_code
+WHERE LOWER(r.region_name) = LOWER('Central America');
+```
+Una vez que hemos obtenido los resultados de esta consulta, procedemos a ejecutar el procedimiento `countries_in_same_region`, pasando **"Central America"** como *parámetro de entrada*. Este procedimiento recupera la lista de países, junto con sus respectivas regiones y monedas, y almacena esta información en un *arreglo asociativo* de tipo `countries_type`. Luego, utilizamos el procedimiento `print_region_array` para imprimir el contenido de este arreglo en la consola. El bloque PL/SQL para realizar esta prueba es el siguiente:
+```sql
+DECLARE
+    region_name VARCHAR2(50) := 'Central America';
+    countries TRAVELER_ASSISTANCE_PACKAGE.countries_type;
+BEGIN
+    TRAVELER_ASSISTANCE_PACKAGE.COUNTRIES_IN_SAME_REGION(region_name, countries);
+    TRAVELER_ASSISTANCE_PACKAGE.PRINT_REGION_ARRAY(countries);
+END;
+```
+Durante la ejecución de este bloque, el procedimiento `countries_in_same_region` debería recuperar todos los países asociados con la región **"Central America"** y almacenarlos en el arreglo `countries`. Luego, el procedimiento `print_region_array` imprimirá en la consola los valores de `COUNTRY_NAME`, `REGION_NAME`, y `CURRENCY_NAME` para cada país. Estos resultados deben coincidir con los que se obtuvieron en la consulta SQL directa realizada previamente, de ser así (que es así), entonces concluimos que la solución **es correcta**.
+
+### Prueba 4:
+```sql
+SELECT c.country_name, l.language_name, sl.official
+FROM WF_COUNTRIES c
+JOIN WF_SPOKEN_LANGUAGES sl ON c.country_id = sl.country_id
+JOIN WF_LANGUAGES l ON sl.language_id = l.language_id
+WHERE UPPER(c.country_name) = UPPER('Belize');
+
+DECLARE
+    country_name VARCHAR2(50) := 'Belize';
+    country_langs TRAVELER_ASSISTANCE_PACKAGE.country_languages_type;
+BEGIN
+    TRAVELER_ASSISTANCE_PACKAGE.COUNTRY_LANGUAGES(country_name, country_langs);
+    TRAVELER_ASSISTANCE_PACKAGE.PRINT_LANGUAGE_ARRAY(country_langs);
+END;
+```
+Para probar el procedimiento `country_languages` del paquete `traveler_assistance_package`, comenzamos realizando una **consulta directa** a las tablas `WF_COUNTRIES`, `WF_SPOKEN_LANGUAGES`, y `WF_LANGUAGES` para obtener los valores de `COUNTRY_NAME`, `LANGUAGE_NAME`, y `OFFICIAL` para todos los idiomas hablados en el país **"Belize"**. Esta consulta nos proporciona una referencia para validar los resultados que serán generados por el procedimiento. La consulta SQL utilizada es la siguiente:
+```sql
+SELECT c.country_name, l.language_name, sl.official
+FROM WF_COUNTRIES c
+JOIN WF_SPOKEN_LANGUAGES sl ON c.country_id = sl.country_id
+JOIN WF_LANGUAGES l ON sl.language_id = l.language_id
+WHERE UPPER(c.country_name) = UPPER('Belize');
+```
+Una vez que hemos obtenido los resultados de esta consulta, procedemos a ejecutar el procedimiento `country_languages`, pasando **"Belize"** como *parámetro de entrada*. Este procedimiento **recupera la lista** de idiomas hablados en el país, junto con una indicación de si cada idioma **es oficial o no**, y **almacena esta información en un arreglo asociativo** de tipo `country_languages_type`. Luego, utilizamos el procedimiento `print_language_array` para imprimir el contenido de este arreglo en la consola. El bloque PL/SQL para realizar esta prueba es el siguiente:
+```sql
+DECLARE
+    country_name VARCHAR2(50) := 'Belize';
+    country_langs TRAVELER_ASSISTANCE_PACKAGE.country_languages_type;
+BEGIN
+    TRAVELER_ASSISTANCE_PACKAGE.COUNTRY_LANGUAGES(country_name, country_langs);
+    TRAVELER_ASSISTANCE_PACKAGE.PRINT_LANGUAGE_ARRAY(country_langs);
+END;
+```
+Durante la ejecución de este bloque, el procedimiento country_languages debería recuperar **todos los idiomas asociados** con **"Belize"** y almacenarlos en el arreglo `country_langs`. Luego, el procedimiento `print_language_array` *imprimirá* en la consola los valores de `COUNTRY_NAME`, `LANGUAGE_NAME`, y `OFFICIAL` para cada idioma. Estos resultados deben coincidir con los obtenidos en la consulta SQL directa realizada previamente.
+
+## Paquete **traveler_admin_package**
+Para la segunda parte del proyecto, nos enfocamos en la **administración** del *sistema de viajeros* mediante la creación de un paquete denominado `traveler_admin_package`. Este paquete tiene como objetivo proporcionar **herramientas** y **procedimientos** útiles para el *mantenimiento* y *gestión* del sistema.
+
+El paquete en cuestión cuenta con tres procedimientos:
+1. display_disabled_triggers
+2. all_dependent_objects
+3. print_dependent_objects
+
